@@ -1,0 +1,13 @@
+{
+  "name": "lakreet-swarm",
+  "version": "0.1.0",
+  "description": "Render many videos from one EffectCraft template and a CSV file",
+  "type": "module",
+  "bin": {
+    "lakreet-swarm": "src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
