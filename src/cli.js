@@ -58,7 +58,7 @@ if (data.problems.length > 0) {
 
 console.log(`${data.rows.length} row(s) ready to render.`);
 
-const result = renderAll({
+const result = await renderAll({
   cliPath,
   template: values.template,
   rows: data.rows,
