@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.js"],
+  "exclude": ["node_modules", "out", "dist", "test", "scripts"],
+  "files": [
+    "src/cli.js",
+    "src/errors.js",
+    "src/config.js",
+    "src/data.js",
+    "src/types.js",
+    "src/csv.js",
+    "src/media.js",
+    "src/find-cli.js",
+    "src/template.js",
+    "src/progress.js",
+    "src/render.js",
+    "src/naming.js",
+    "src/selection.js",
+    "src/report.js",
+    "src/prepare.js",
+    "src/commands/render.js",
+    "src/commands/check.js",
+    "src/commands/inspect.js",
+    "src/commands/init.js",
+    "src/commands/preview.js",
+    "src/commands/doctor.js"
+  ]
+}

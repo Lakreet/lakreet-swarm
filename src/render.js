@@ -1,67 +1,227 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { pacmanBar, formatEta, drawStatus, clearStatus } from "./progress.js";
 import { runRender } from "./run-cli.js";
+import { safeName } from "./naming.js";
 
-export function safeName(text) {
-  const cleaned = text.replace(/[<>:"\/\\|?*]/g, "_").trim();
-  return cleaned.slice(0, 60) || "untitled";
-}
+// Core batch engine. Renders one video per row.
+//
+// ctx:
+//   cliPath, template, rows (each with .index/.base/.values), outDir
+//   format        EffectCraft --format value (h264 default)
+//   extraArgs     raw args after `--`
+//   retries       number of extra attempts on failure
+//   failFast      stop at first failure
+//   timeout       per-render timeout in seconds (0 = none)
+//   skipExisting  skip rows whose output file already exists and is non-empty
+//   keepValues    keep the per-row values JSON files
+//   runner        injectable runner for tests
+//   events        { onStart, onRowStart, onRowDone, onDone }
+//
+// Returns { report, exitCode }.
+export async function runBatch(ctx) {
+  const {
+    cliPath,
+    template,
+    rows,
+    outDir,
+    format = "h264",
+    extraArgs = [],
+    retries = 0,
+    failFast = false,
+    timeout = 0,
+    skipExisting = false,
+    keepValues = false,
+    runner,
+    state = {},
+    events = {},
+  } = ctx;
 
-export async function renderAll({ cliPath, template, rows, outDir }) {
   mkdirSync(outDir, { recursive: true });
+  const valuesDir = join(outDir, ".lakreet", "values");
+  mkdirSync(valuesDir, { recursive: true });
+
   const total = rows.length;
-  const animate = Boolean(process.stdout.isTTY);
+  if (events.onStart) events.onStart(total);
+
   const durations = [];
-  const failed = [];
-  let ok = 0;
+  const reportRows = [];
+  let succeeded = 0;
+  let failed = 0;
+  let skipped = 0;
 
-  for (const [index, row] of rows.entries()) {
-    const first = Object.values(row.values)[0];
-    const label = `${index + 1}-${safeName(String(first ?? ""))}`;
-    const valuesFile = join(outDir, `${label}.values.json`);
-    const videoFile = join(outDir, `${label}.mp4`);
-    writeFileSync(valuesFile, JSON.stringify(row.values));
+  for (const row of rows) {
+    if (state.interrupted) break;
 
-    const prefix = `[${index + 1}/${total}] ${label}`;
-    const started = Date.now();
-    const average = durations.length
-      ? durations.reduce((a, b) => a + b, 0) / durations.length
-      : null;
-    let reported = null;
-    let tick = 0;
+    const videoFile = join(outDir, `${row.base}.${extensionFor(format)}`);
+    const valuesFile = join(valuesDir, `${row.base}.values.json`);
 
-    const draw = () => {
-      const elapsed = (Date.now() - started) / 1000;
-      const current = reported ?? (average ? Math.min(0.95, elapsed / average) : 0);
-      const overall = (index + current) / total;
-      const eta = average ? Math.max(0, (total - index - current) * average) : null;
-      const percent = String(Math.floor(overall * 100)).padStart(3, " ");
-      drawStatus(`${pacmanBar(overall, tick++)} ${percent}%  ${prefix}  ${formatEta(eta)}`);
-    };
-
-    const timer = animate ? setInterval(draw, 100) : null;
-    const args = ["render", "--template", template, "--values", valuesFile, "--out", videoFile];
-    const result = await runRender(cliPath, args, (p) => {
-      reported = p.done / p.total;
-    });
-    if (timer) {
-      clearInterval(timer);
-      clearStatus();
+    // --skip-existing
+    if (skipExisting && existsNonEmpty(videoFile)) {
+      skipped++;
+      reportRows.push({
+        index: row.index,
+        where: row.where,
+        status: "skipped",
+        output: videoFile,
+        seconds: 0,
+        error: null,
+      });
+      if (events.onRowDone) {
+        events.onRowDone({
+          index: row.index,
+          total,
+          where: row.where,
+          base: row.base,
+          status: "skipped",
+          output: videoFile,
+        });
+      }
+      continue;
     }
 
-    const took = (Date.now() - started) / 1000;
+    writeFileSync(valuesFile, JSON.stringify(row.values));
+
+    if (events.onRowStart) {
+      events.onRowStart({ index: row.index, where: row.where, total, base: row.base });
+    }
+
+    const start = Date.now();
+    const result = await attemptRender({
+      cliPath,
+      template,
+      valuesFile,
+      videoFile,
+      format,
+      extraArgs,
+      retries,
+      timeout,
+      runner,
+    });
+    const seconds = (Date.now() - start) / 1000;
+
+    if (!keepValues && result.ok) {
+      try {
+        unlinkSync(valuesFile);
+      } catch {
+        /* best-effort */
+      }
+    }
+
     if (result.ok) {
-      durations.push(took);
-      ok++;
-      console.log(`${prefix}  done in ${took.toFixed(1)}s`);
+      succeeded++;
+      durations.push(seconds);
+      reportRows.push({
+        index: row.index,
+        where: row.where,
+        status: "ok",
+        output: videoFile,
+        seconds: round(seconds),
+        error: null,
+      });
+      if (events.onRowDone) {
+        events.onRowDone({
+          index: row.index,
+          total,
+          where: row.where,
+          base: row.base,
+          status: "ok",
+          output: videoFile,
+          seconds,
+        });
+      }
     } else {
-      failed.push(label);
-      console.log(`${prefix}  FAILED`);
-      console.error(`  line ${row.lineNumber}: ${result.message}`);
+      failed++;
+      reportRows.push({
+        index: row.index,
+        where: row.where,
+        status: "failed",
+        output: videoFile,
+        seconds: round(seconds),
+        error: result.message || "render failed",
+      });
+      if (events.onRowDone) {
+        events.onRowDone({
+          index: row.index,
+          total,
+          where: row.where,
+          base: row.base,
+          status: "failed",
+          output: videoFile,
+          seconds,
+          error: result.message,
+        });
+      }
+      if (failFast) break;
     }
   }
 
-  if (animate) console.log(`${pacmanBar(1)} 100%`);
-  return { ok, failed };
+  const summary = { total: succeeded + failed + skipped, succeeded, failed, skipped };
+  if (events.onDone) events.onDone(summary);
+
+  return {
+    reportRows,
+    summary,
+    interrupted: Boolean(state.interrupted),
+    durationAvg: durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null,
+  };
 }
+
+async function attemptRender({
+  cliPath,
+  template,
+  valuesFile,
+  videoFile,
+  format,
+  extraArgs,
+  retries,
+  timeout,
+  runner,
+}) {
+  const args = [
+    "render",
+    "--template",
+    template,
+    "--values",
+    valuesFile,
+    "--out",
+    videoFile,
+    "--format",
+    format,
+    ...extraArgs,
+  ];
+  let last = { ok: false, message: "render failed" };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    last = await runRender(cliPath, args, null, { timeout: timeout * 1000, runner });
+    if (last.ok) return last;
+  }
+  return last;
+}
+
+function extensionFor(format) {
+  switch (format) {
+    case "webm":
+      return "webm";
+    case "png":
+      return "png";
+    case "jpeg":
+      return "jpg";
+    case "gif":
+      return "gif";
+    default:
+      return "mp4";
+  }
+}
+
+function existsNonEmpty(path) {
+  try {
+    return statSync(path).size > 0;
+  } catch {
+    return false;
+  }
+}
+
+function round(n) {
+  return Math.round(n * 10) / 10;
+}
+
+export { safeName };

@@ -9,7 +9,7 @@ const FALSE_WORDS = new Set(["false", "no", "n", "0", "off", "tidak"]);
 
 const registry = {
   text: {
-    coerce(raw) {
+    coerce(raw, _ctx) {
       return { value: raw == null ? "" : String(raw) };
     },
   },

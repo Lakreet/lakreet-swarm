@@ -1,10 +1,22 @@
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
 import { parseCsv } from "./csv.js";
+import { coerce } from "./types.js";
+import { validateMediaValue } from "./media.js";
 
-// Read a data file and return { rows, problems }.
-// The parser is chosen by extension: .csv/.tsv, .json, .jsonl/.ndjson.
-export function readRows(dataPath, controls) {
+// Read a data file and validate every row against the template controls.
+//
+// Options:
+//   controls    { name: type } from the template (property controls)
+//   media       [ names ] of media controls (validated as file paths)
+//   columns     { csvHeader: controlName } mapping from config
+//   baseDir     folder to resolve relative media paths against
+//   emptyAsDefault  treat empty text cells as "use template default"
+//
+// Returns { rows, problems, warnings }.
+export function readRows(dataPath, controls, options = {}) {
+  const { media = [], columns = {}, baseDir, emptyAsDefault = false } = options;
+
   let text;
   try {
     text = readFileSync(dataPath, "utf8").replace(/^\uFEFF/, "");
@@ -16,26 +28,37 @@ export function readRows(dataPath, controls) {
   }
 
   const ext = extname(dataPath).toLowerCase();
-  let entries; // [{ where, values }]
+  let entries;
+  let headers = null;
   if (ext === ".json") {
     entries = parseJsonData(text);
   } else if (ext === ".jsonl" || ext === ".ndjson") {
     entries = parseJsonlData(text);
   } else {
-    entries = parseDelimitedData(text);
+    const parsed = parseDelimitedData(text);
+    headers = parsed.headers;
+    entries = parsed.entries;
   }
 
-  return validateEntries(entries, controls);
+  return validateEntries(entries, {
+    controls,
+    media,
+    columns,
+    baseDir,
+    emptyAsDefault,
+    dataPath,
+    headers,
+  });
 }
 
 function parseDelimitedData(text) {
   const { headers, rows } = parseCsv(text);
-  return rows.map(({ lineNumber, cells }) => ({
+  const entries = rows.map(({ lineNumber, cells }) => ({
     where: `line ${lineNumber}`,
     lineNumber,
-    headers,
     cells,
   }));
+  return { headers, entries };
 }
 
 function parseJsonData(text) {
@@ -43,7 +66,7 @@ function parseJsonData(text) {
   try {
     data = JSON.parse(text);
   } catch (error) {
-    throw new Error(`Invalid JSON: ${error.message}`);
+    throw new Error(`Invalid JSON: ${error.message}`, { cause: error });
   }
   const list = Array.isArray(data) ? data : Array.isArray(data.rows) ? data.rows : null;
   if (!list) {
@@ -62,74 +85,83 @@ function parseJsonlData(text) {
     try {
       obj = JSON.parse(line);
     } catch (error) {
-      throw new Error(`Invalid JSON on line ${i + 1}: ${error.message}`);
+      throw new Error(`Invalid JSON on line ${i + 1}: ${error.message}`, { cause: error });
     }
     out.push({ where: `line ${i + 1}`, object: obj });
   }
   return out;
 }
 
-function validateEntries(entries, controls) {
+function validateEntries(entries, ctx) {
+  const { controls, media, columns, baseDir, emptyAsDefault, headers } = ctx;
   const problems = [];
-  const known = Object.keys(controls);
+  const warnings = [];
+  const allKnown = new Set([...Object.keys(controls), ...media]);
+  const mediaSet = new Set(media);
 
-  // For delimited data, validate headers once up-front.
-  const first = entries[0];
-  if (first && first.headers) {
-    for (const header of first.headers) {
-      if (!Object.hasOwn(controls, header)) {
+  // Map a CSV header to a control name (honouring config `columns`).
+  const mapHeader = (header) => columns[header] ?? header;
+
+  // Validate headers once (delimited data only), even when there are no rows.
+  if (headers) {
+    for (const header of headers) {
+      if (header.startsWith("#")) continue; // comment column
+      const target = mapHeader(header);
+      if (!allKnown.has(target)) {
         problems.push(
-          `Column "${header}" is not a control of the template. Available: ${known.join(", ")}`
+          `Column "${header}" is not a control of the template. Available: ${[...allKnown].join(", ")}`
         );
       }
     }
-    if (problems.length > 0) return { rows: [], problems };
+    if (problems.length > 0) return { rows: [], problems, warnings };
   }
 
   const rows = [];
   for (const entry of entries) {
-    let values = {};
-    if (entry.headers) {
-      // Delimited row: cells line up with headers.
-      if (entry.cells.length !== entry.headers.length) {
+    // Normalize to { controlName: rawValue }.
+    const byControl = {};
+    if (entry.cells) {
+      if (headers && entry.cells.length !== headers.length) {
         problems.push(
-          `${entry.where}: expected ${entry.headers.length} columns, found ${entry.cells.length}.`
+          `${entry.where}: expected ${headers.length} columns, found ${entry.cells.length}.`
         );
         continue;
       }
-      entry.headers.forEach((header, col) => {
-        values[header] = entry.cells[col];
+      headers.forEach((header, col) => {
+        if (header.startsWith("#")) return;
+        byControl[mapHeader(header)] = entry.cells[col];
       });
     } else {
-      // JSON / JSONL object.
-      values = entry.object;
-      for (const key of Object.keys(values)) {
-        if (key.startsWith("#")) continue; // comment column
-        if (!Object.hasOwn(controls, key)) {
-          problems.push(
-            `${entry.where}, column "${key}": not a control of the template. Available: ${known.join(", ")}`
-          );
-        }
+      for (const [key, raw] of Object.entries(entry.object)) {
+        if (key.startsWith("#")) continue;
+        byControl[mapHeader(key)] = raw;
       }
     }
 
-    // Coerce values by control type.
-    for (const [key, raw] of Object.entries(values)) {
-      if (key.startsWith("#")) continue;
-      const type = controls[key];
-      if (type === "slider") {
-        const number = typeof raw === "number" ? raw : Number(String(raw).trim());
-        if (raw === "" || raw == null || Number.isNaN(number)) {
-          problems.push(`${entry.where}, column "${key}": "${raw}" is not a number.`);
+    const values = {};
+    for (const [name, raw] of Object.entries(byControl)) {
+      const where = entry.where;
+      if (mediaSet.has(name)) {
+        const result = validateMediaValue(raw, { where, column: name, baseDir });
+        if (result.error) {
+          problems.push(result.error);
         } else {
-          values[key] = number;
+          if (result.warnings) warnings.push(...result.warnings);
+          values[name] = result.path;
         }
+        continue;
+      }
+      const type = controls[name];
+      if (raw === "" && emptyAsDefault) continue; // leave as template default
+      const result = coerce(type, raw, { where, column: name });
+      if (result.error) {
+        problems.push(result.error);
       } else {
-        values[key] = raw == null ? "" : typeof raw === "string" ? raw : String(raw);
+        values[name] = result.value;
       }
     }
     rows.push({ where: entry.where, lineNumber: entry.lineNumber, values });
   }
 
-  return { rows, problems };
+  return { rows, problems, warnings };
 }

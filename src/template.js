@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { SwarmError } from "./errors.js";
 
-export function readTemplateControls(cliPath, templatePath) {
+// Read a template's manifest via effectcraft-cli.
+// Returns { controls: {name: type}, info } where info is the full manifest.
+export function readTemplate(cliPath, templatePath) {
   let output;
   try {
     output = execFileSync(
@@ -17,13 +20,32 @@ export function readTemplateControls(cliPath, templatePath) {
     );
   } catch (error) {
     const reason = error.stderr?.toString().trim() || error.message;
-    throw new Error(`Could not read template "${templatePath}": ${reason}`);
+    throw new SwarmError(
+      "E_TEMPLATE_UNREADABLE",
+      `Could not read template "${templatePath}": ${reason}`
+    );
   }
 
-  const info = JSON.parse(output);
+  let info;
+  try {
+    info = JSON.parse(output);
+  } catch (error) {
+    throw new SwarmError(
+      "E_TEMPLATE_UNREADABLE",
+      `Template "${templatePath}" did not return valid JSON: ${error.message}`
+    );
+  }
+
+  // controls: name -> type (property controls only; media listed separately).
   const controls = {};
-  for (const control of info.controls) {
+  for (const control of info.controls ?? []) {
+    if (control.missing) continue;
     controls[control.name] = control.type;
   }
-  return controls;
+  return { controls, info };
+}
+
+// Backwards-compatible helper used by older call sites.
+export function readTemplateControls(cliPath, templatePath) {
+  return readTemplate(cliPath, templatePath).controls;
 }
