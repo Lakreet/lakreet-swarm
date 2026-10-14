@@ -31,13 +31,13 @@ You will get one video per CSV row in the `out` folder.
 lakreet-swarm --template <file.ectemplate> --data <file.csv> [--out <folder>] [--cli <path>]
 ```
 
-| Option | Description |
-| --- | --- |
-| `--template` | The EffectCraft template (`.ectemplate`) to render. |
-| `--data` | The CSV file with one row per video. |
-| `--out` | Output folder. Default: `out`. |
-| `--cli` | Path to `effectcraft-cli`. Usually not needed, see below. |
-| `-h`, `--help` | Show usage. |
+| Option         | Description                                               |
+| -------------- | --------------------------------------------------------- |
+| `--template`   | The EffectCraft template (`.ectemplate`) to render.       |
+| `--data`       | The CSV file with one row per video.                      |
+| `--out`        | Output folder. Default: `out`.                            |
+| `--cli`        | Path to `effectcraft-cli`. Usually not needed, see below. |
+| `-h`, `--help` | Show usage.                                               |
 
 ### Finding effectcraft-cli
 

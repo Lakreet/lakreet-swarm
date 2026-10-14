@@ -1,2 +1,8 @@
 node_modules/
 out/
+coverage/
+*.log
+.lakreet-cache/
+.DS_Store
+jobdesk.md
+demo.js

@@ -5,7 +5,14 @@ export function readTemplateControls(cliPath, templatePath) {
   try {
     output = execFileSync(
       cliPath,
-      ["exec", "essential.templateInfo", "--params", JSON.stringify({ path: templatePath }), "--empty", "--json"],
+      [
+        "exec",
+        "essential.templateInfo",
+        "--params",
+        JSON.stringify({ path: templatePath }),
+        "--empty",
+        "--json",
+      ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
     );
   } catch (error) {

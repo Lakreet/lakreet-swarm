@@ -16,14 +16,18 @@ const { values } = parseArgs({
 });
 
 if (values.help || !values.template || !values.data) {
-  console.log("Usage: lakreet-swarm --template <file.ectemplate> --data <file.csv> [--out <folder>]");
+  console.log(
+    "Usage: lakreet-swarm --template <file.ectemplate> --data <file.csv> [--out <folder>]"
+  );
   process.exit(values.help ? 0 : 1);
 }
 
 const cliPath = findCli(values.cli);
 if (!cliPath) {
   console.error("effectcraft-cli was not found.");
-  console.error("Install EffectCraft, or point to it with --cli <path> or the EFFECTCRAFT_CLI variable.");
+  console.error(
+    "Install EffectCraft, or point to it with --cli <path> or the EFFECTCRAFT_CLI variable."
+  );
   process.exit(1);
 }
 

@@ -25,7 +25,9 @@ export async function renderAll({ cliPath, template, rows, outDir }) {
 
     const prefix = `[${index + 1}/${total}] ${label}`;
     const started = Date.now();
-    const average = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+    const average = durations.length
+      ? durations.reduce((a, b) => a + b, 0) / durations.length
+      : null;
     let reported = null;
     let tick = 0;
 
