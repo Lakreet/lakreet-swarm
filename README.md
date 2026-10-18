@@ -4,7 +4,7 @@ Render many videos from one [EffectCraft](https://github.com/storytold/effectcra
 
 **Documentation:** https://lakreet.github.io/swarm/
 
-You design a video once in EffectCraft, mark the parts that should change (a title, an opacity, a media file, ...), and `lakreet-swarm` renders one video per row of your data file. No window, no clicking, no editing each copy by hand.
+You design a video once in EffectCraft, mark the parts that should change (a title, an opacity, a checkbox, ...), and `lakreet-swarm` renders one video per row of your data file. No window, no clicking, no editing each copy by hand.
 
 > **Unofficial.** lakreet-swarm is an independent project. It is not affiliated with, sponsored by, or endorsed by the Storytold team or the EffectCraft project. It only calls the `effectcraft-cli` program that ships with EffectCraft.
 
@@ -72,7 +72,6 @@ lakreet-swarm doctor   [--render-test]                                  # enviro
 | `--fps`                 | Frame rate                                           |
 | `--bitrate`             | Video bitrate (kbps)                                 |
 | `--audio`               | `auto`, `on`, `off`                                  |
-| `--media-dir`           | Base folder for relative media paths                 |
 | `--keep-values`         | Keep per-row `.values.json` files                    |
 | `--empty-as-default`    | Empty text cells → use template default              |
 | `--dry-run`             | Validate without rendering                           |
@@ -133,9 +132,7 @@ If your CSV headers don't match the template control names, map them in `lakreet
 
 ### Media columns
 
-Media controls (images, videos) are validated as file paths. Relative paths are resolved against the data file's folder, or `--media-dir`.
-
-> **Note:** Media replacement works through EffectCraft's pipeline mode (`essential.set`), not via `--values`. This tool validates media paths up-front; the actual swap happens during render.
+Replacing images, GIFs and footage is **not supported yet**. EffectCraft's `--values` cannot replace media. If a data column maps to a media control, `check` and `render` stop before rendering with error `E_MEDIA_UNSUPPORTED` (exit code 3). A media control that is not present as a column keeps the template's default media. Use text, number and checkbox controls for now.
 
 ### Comment columns
 
@@ -163,7 +160,6 @@ Create `lakreet.config.json` in your project root:
   "name": "{index:3}-{slug:Title}",
   "columns": { "Judul": "Source Text" },
   "render": { "format": "webm", "quality": "best" },
-  "mediaDir": "assets",
   "delimiter": ",",
   "keepValues": false,
   "emptyAsDefault": false
@@ -237,9 +233,8 @@ Tested combinations (as of v0.2.0):
 
 ## Security
 
-- No shell execution: all CLI arguments are passed as arrays to `spawn`/`execFile`
+- Data values are never placed on a command line, and output names are sanitized before they become file names.
 - `eslint` rule forbids shell-string commands in source
-- Path traversal is not possible through data values (validated against `--media-dir` base)
 
 ## License
 

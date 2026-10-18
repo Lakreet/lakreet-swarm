@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Version bump to 0.2.0
 - `package.json` metadata: repository, homepage, bugs, keywords, `files` list, `prepublishOnly` script
-- Config file schema now includes `template`, `data`, `mediaDir`, `delimiter`, `emptyAsDefault`
+- Config file schema now includes `template`, `data`, `delimiter`, `emptyAsDefault`
 - Exit codes formalized: 0=OK, 1=render failed, 2=usage, 3=invalid data, 4=CLI not found, 5=template unreadable, 130=interrupted
 
 ### Fixed

@@ -171,7 +171,6 @@ Render options:
   --fps N             Frame rate
   --bitrate KBPS      Video bitrate
   --audio MODE        auto|on|off
-  --media-dir DIR     Base folder for relative media paths
   --keep-values       Keep per-row values JSON files
   --empty-as-default  Treat empty text cells as template default
   --dry-run           Validate without rendering
