@@ -1,0 +1,30 @@
+{
+  "comp": 1,
+  "compName": "Comp 1",
+  "controls": [
+    {
+      "group": null,
+      "id": 26,
+      "item": 2,
+      "kind": "media",
+      "layer": 3,
+      "name": "Logo",
+      "type": "media"
+    }
+  ],
+  "duration": 10,
+  "format": "effectcraft-template",
+  "frameRate": 30,
+  "generator": "EffectCraft 0.8.0",
+  "height": 1080,
+  "media": [
+    {
+      "files": ["media/2/logo.png"],
+      "item": 2
+    }
+  ],
+  "name": "Comp 1",
+  "poster": "poster.png",
+  "version": 1,
+  "width": 1920
+}
