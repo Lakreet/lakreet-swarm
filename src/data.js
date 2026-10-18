@@ -3,6 +3,7 @@ import { extname } from "node:path";
 import { parseCsv } from "./csv.js";
 import { coerce } from "./types.js";
 import { validateMediaValue } from "./media.js";
+import { SwarmError } from "./errors.js";
 
 // Read a data file and validate every row against the template controls.
 //
@@ -93,11 +94,15 @@ function parseJsonlData(text) {
 }
 
 function validateEntries(entries, ctx) {
-  const { controls, media, columns, baseDir, emptyAsDefault, headers } = ctx;
+  const { controls, columns, baseDir, emptyAsDefault, headers } = ctx;
   const problems = [];
   const warnings = [];
-  const allKnown = new Set([...Object.keys(controls), ...media]);
-  const mediaSet = new Set(media);
+  const mediaSet = new Set(
+    Object.entries(controls)
+      .filter(([, type]) => type === "media")
+      .map(([name]) => name)
+  );
+  const allKnown = new Set(Object.keys(controls));
 
   // Map a CSV header to a control name (honouring config `columns`).
   const mapHeader = (header) => columns[header] ?? header;
@@ -110,6 +115,12 @@ function validateEntries(entries, ctx) {
       if (!allKnown.has(target)) {
         problems.push(
           `Column "${header}" is not a control of the template. Available: ${[...allKnown].join(", ")}`
+        );
+      } else if (mediaSet.has(target)) {
+        throw new SwarmError(
+          "E_MEDIA_UNSUPPORTED",
+          `Column "${header}" maps to a media control; media replacement is not supported yet.`,
+          { hint: "Use text, number or checkbox controls for now, or remove the column." }
         );
       }
     }
@@ -134,7 +145,15 @@ function validateEntries(entries, ctx) {
     } else {
       for (const [key, raw] of Object.entries(entry.object)) {
         if (key.startsWith("#")) continue;
-        byControl[mapHeader(key)] = raw;
+        const target = mapHeader(key);
+        if (mediaSet.has(target)) {
+          throw new SwarmError(
+            "E_MEDIA_UNSUPPORTED",
+            `${entry.where}: Column "${key}" maps to a media control; media replacement is not supported yet.`,
+            { hint: "Use text, number or checkbox controls for now, or remove the column." }
+          );
+        }
+        byControl[target] = raw;
       }
     }
 

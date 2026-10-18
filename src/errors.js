@@ -21,6 +21,10 @@ const CATALOG = {
     exitCode: EXIT.DATA_INVALID,
     hint: "Fix the reported rows/columns, then run again.",
   },
+  E_MEDIA_UNSUPPORTED: {
+    exitCode: EXIT.DATA_INVALID,
+    hint: "Use text, number or checkbox controls for now, or remove the column.",
+  },
   E_MEDIA_MISSING: {
     exitCode: EXIT.DATA_INVALID,
     hint: "Point the media column at an existing file, or set --media-dir.",

@@ -38,6 +38,11 @@ const registry = {
       };
     },
   },
+  media: {
+    coerce() {
+      return { error: "media replacement is not supported yet." };
+    },
+  },
 };
 
 function where(ctx) {

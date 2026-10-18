@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Media controls rejected in data validation**: When a data column maps to a template control of type `media`, `check` and `render` now fail fast with `E_MEDIA_UNSUPPORTED` (exit code 3) instead of passing validation and failing later at render time. Message: "Column 'Logo' maps to a media control; media replacement is not supported yet." Hint: "Use text, number or checkbox controls for now, or remove the column." The data line number is reported.
+- **Media controls without data columns still work**: A media control that is NOT present as a column in the data file is allowed; the template default is used.
+- **`--media-dir` flag rejected**: The `--media-dir` CLI flag and `mediaDir` config option now fail with `E_MEDIA_UNSUPPORTED` (exit code 3) instead of being accepted silently.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added

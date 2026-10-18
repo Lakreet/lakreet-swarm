@@ -14,6 +14,17 @@ import { SwarmError } from "./errors.js";
 export function prepare(flags) {
   const config = loadConfig(flags.config);
 
+  // --media-dir is not supported yet (media replacement via essential.set is not implemented).
+  if (flags.mediaDir || config.mediaDir) {
+    throw new SwarmError(
+      "E_MEDIA_UNSUPPORTED",
+      "--media-dir is not supported yet; media replacement is not implemented.",
+      {
+        hint: "Remove --media-dir / mediaDir from config, or use text/number/checkbox controls only.",
+      }
+    );
+  }
+
   // Column mapping: config.columns may map header -> control.
   const options = mergeOptions([
     {

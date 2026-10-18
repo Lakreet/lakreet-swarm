@@ -73,3 +73,65 @@ test("reads JSONL", () => {
   assert.equal(result.rows.length, 2);
   assert.equal(result.problems.length, 0);
 });
+
+const MEDIA_CONTROLS = { "Source Text": "text", Logo: "media" };
+
+test("rejects CSV column that maps to a media control", () => {
+  const file = writeData("media-col.csv", "Source Text,Logo\nHi,logo.png\n");
+  assert.throws(
+    () => readRows(file, MEDIA_CONTROLS, { media: ["Logo"] }),
+    (err) =>
+      err.code === "E_MEDIA_UNSUPPORTED" &&
+      err.message.includes('Column "Logo" maps to a media control')
+  );
+});
+
+test("rejects CSV column mapped via config to a media control", () => {
+  const file = writeData("media-map.csv", "Source Text,MyLogo\nHi,logo.png\n");
+  assert.throws(
+    () => readRows(file, MEDIA_CONTROLS, { media: ["Logo"], columns: { MyLogo: "Logo" } }),
+    (err) =>
+      err.code === "E_MEDIA_UNSUPPORTED" &&
+      err.message.includes('Column "MyLogo" maps to a media control')
+  );
+});
+
+test("rejects JSON key that maps to a media control", () => {
+  const file = writeData("media.json", JSON.stringify([{ "Source Text": "A", Logo: "logo.png" }]));
+  assert.throws(
+    () => readRows(file, MEDIA_CONTROLS, { media: ["Logo"] }),
+    (err) =>
+      err.code === "E_MEDIA_UNSUPPORTED" &&
+      err.message.includes('Column "Logo" maps to a media control')
+  );
+});
+
+test("rejects JSONL key that maps to a media control", () => {
+  const file = writeData(
+    "media.jsonl",
+    '{"Source Text":"A","Logo":"logo.png"}\n{"Source Text":"B","Logo":"logo2.png"}\n'
+  );
+  assert.throws(
+    () => readRows(file, MEDIA_CONTROLS, { media: ["Logo"] }),
+    (err) =>
+      err.code === "E_MEDIA_UNSUPPORTED" &&
+      err.message.includes('Column "Logo" maps to a media control')
+  );
+});
+
+test("allows media control when NOT present as a column (uses template default)", () => {
+  const file = writeData("no-media-col.csv", "Source Text\nHi\n");
+  const result = readRows(file, MEDIA_CONTROLS, { media: ["Logo"] });
+  assert.equal(result.problems.length, 0);
+  assert.equal(result.rows.length, 1);
+  assert.deepEqual(result.rows[0].values, { "Source Text": "Hi" });
+});
+
+test("allows non-media columns alongside media controls in template", () => {
+  const file = writeData("mixed.csv", "Source Text,Opacity\nHi,50\n");
+  const controls = { "Source Text": "text", Opacity: "slider", Logo: "media" };
+  const result = readRows(file, controls, { media: ["Logo"] });
+  assert.equal(result.problems.length, 0);
+  assert.equal(result.rows.length, 1);
+  assert.deepEqual(result.rows[0].values, { "Source Text": "Hi", Opacity: 50 });
+});
