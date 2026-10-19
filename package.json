@@ -2,6 +2,7 @@
   "name": "lakreet-swarm",
   "version": "0.2.0",
   "description": "Render many videos from one EffectCraft template and a CSV/JSON file",
+  "author": "[Ibnu Alif Muhadzdzib Widanto] (https://github.com/IbnuMuhadzdzib)",
   "keywords": [
     "effectcraft",
     "video",

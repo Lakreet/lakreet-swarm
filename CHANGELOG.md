@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.2.0] - 2026-10-18
+## [0.2.0] - 2026-10-19
 
 - **Media controls rejected in data validation**: When a data column maps to a template control of type `media`, `check` and `render` now fail fast with `E_MEDIA_UNSUPPORTED` (exit code 3) instead of passing validation and failing later at render time. Message: "Column 'Logo' maps to a media control; media replacement is not supported yet." Hint: "Use text, number or checkbox controls for now, or remove the column." The data line number is reported.
 - **Media controls without data columns still work**: A media control that is NOT present as a column in the data file is allowed; the template default is used.

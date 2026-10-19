@@ -66,7 +66,8 @@ lakreet-swarm doctor   [--render-test]                                  # enviro
 | `--retries`             | Extra attempts for a failed render                   |
 | `--fail-fast`           | Stop at first failure                                |
 | `--timeout`             | Per-render timeout in seconds                        |
-| `--format`              | Output format: `h264`, `webm`, `png`, `jpeg`, `gif`  |
+| `--format`              | Output format passed to EffectCraft. `h264` is the   |
+|                         | tested default; other formats are not verified yet   |
 | `--resolution`          | `full`, `half`, `third`, `quarter`                   |
 | `--quality`             | `best`, `draft`                                      |
 | `--fps`                 | Frame rate                                           |
